@@ -11,7 +11,7 @@ from torchtitan.components.lr_scheduler import build_lr_schedulers
 from torchtitan.components.optimizer import build_optimizers
 from torchtitan.components.tokenizer import build_hf_tokenizer
 from torchtitan.components.validate import build_validator
-from torchtitan.datasets.hf_datasets import build_hf_dataloader
+from torchtitan.hf_datasets.text_datasets import build_text_dataloader
 from torchtitan.models.moe import MoEArgs
 from torchtitan.protocols.train_spec import TrainSpec
 
@@ -24,12 +24,12 @@ __all__ = [
     "parallelize_qwen3",
     "Qwen3ModelArgs",
     "Qwen3Model",
-    "qwen3_configs",
+    "qwen3_args",
 ]
 
 # Adding different variants of the model
 
-qwen3_configs = {
+qwen3_args = {
     "debugmodel": Qwen3ModelArgs(
         vocab_size=2048,
         max_seq_len=4096,
@@ -194,12 +194,12 @@ qwen3_configs = {
 def get_train_spec() -> TrainSpec:
     return TrainSpec(
         model_cls=Qwen3Model,
-        model_args=qwen3_configs,  # Change from dict to Mapping
+        model_args=qwen3_args,  # Change from dict to Mapping
         parallelize_fn=parallelize_qwen3,
         pipelining_fn=None,
         build_optimizers_fn=build_optimizers,
         build_lr_schedulers_fn=build_lr_schedulers,
-        build_dataloader_fn=build_hf_dataloader,
+        build_dataloader_fn=build_text_dataloader,
         build_tokenizer_fn=build_hf_tokenizer,
         build_loss_fn=build_cross_entropy_loss,
         build_validator_fn=build_validator,

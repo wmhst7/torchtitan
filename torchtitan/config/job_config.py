@@ -4,23 +4,39 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import json
+
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
+
+import torch
+
+from torchtitan.tools.logging import logger
 
 
 @dataclass
 class Job:
     config_file: str | None = None
-    """Job config file"""
+    """File to read job configs from"""
 
-    dump_folder: str = "./torchtitan/outputs"
+    dump_folder: str = "./outputs"
     """Folder to dump job outputs"""
 
     description: str = "default job"
     """Description of the job"""
 
-    print_args: bool = False
-    """Print the args to terminal"""
+    print_config: bool = False
+    """Print the job configs to terminal"""
+
+    save_config_file: str | None = None
+    """Path to save job config into"""
+
+    custom_config_module: str = ""
+    """
+    This option allows users to extend the existing JobConfig with a customized
+    JobConfig dataclass. Users need to ensure that the path can be imported.
+    """
 
 
 @dataclass
@@ -269,9 +285,6 @@ class Parallelism:
     parallelism method used is DDP (Distributed Data Parallelism).
     1 means disabled.
     """
-
-    enable_compiled_autograd: bool = False
-    """Enable CompiledAutograd to compile the backward."""
 
     data_parallel_shard_degree: int = -1
     """
@@ -834,8 +847,10 @@ class Experimental:
 
     custom_args_module: str = ""
     """
+    DEPRECATED (moved to Job.custom_config_module). Will be removed soon.
+
     This option allows users to extend TorchTitan's existing JobConfig by extending
-    a user defined JobConfig dataclass. Similar to ``--experimental.custom_model_path``, the user
+    a user defined JobConfig dataclass. Similar to ``--experimental.custom_import``, the user
     needs to ensure that the path can be imported.
     """
 
@@ -900,3 +915,20 @@ class JobConfig:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def maybe_log(self) -> None:
+        if self.job.print_config:
+            logger.info(f"Running with configs: {self.to_dict()}")
+
+        if self.job.save_config_file is not None:
+            config_file = os.path.join(self.job.dump_folder, self.job.save_config_file)
+            if torch.distributed.is_initialized():
+                if torch.distributed.get_rank() == 0:
+                    os.makedirs(os.path.dirname(config_file), exist_ok=True)
+                    with open(config_file, "w") as f:
+                        json.dump(self.to_dict(), f, indent=2)
+                logger.info(f"Saved job configs to {config_file}")
+            else:
+                logger.warning(
+                    "Job configs logging is disabled due to torch.distributed not initialized."
+                )
